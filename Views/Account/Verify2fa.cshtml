@@ -1,0 +1,44 @@
+@model SecureWebApp.Models.TwoFactorViewModel
+@{
+    ViewData["Title"] = "Two-Factor Verification - Ace Job Agency";
+}
+
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-orange-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-bold text-gray-900">Two-Factor Authentication</h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Please enter the 6-digit code from your authenticator app (e.g., Google Authenticator).
+            </p>
+        </div>
+
+        <form asp-action="Verify2fa" method="post" class="mt-8 space-y-6 bg-white p-8 rounded-2xl shadow-lg">
+            <div asp-validation-summary="ModelOnly" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"></div>
+
+            <div class="space-y-4">
+                <div>
+                    <label asp-for="Code" class="block text-sm font-medium text-gray-700 mb-2"></label>
+                    <input asp-for="Code"
+                           class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors"
+                           placeholder="Enter 6-digit code" />
+                    <span asp-validation-for="Code" class="block mt-1 text-xs text-red-600"></span>
+                </div>
+            </div>
+
+            @Html.HiddenFor(m => m.RememberMe)
+            @Html.HiddenFor(m => m.ReturnUrl)
+
+            <div>
+                <button type="submit" class="w-full py-3 px-6 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
+                    Verify and Login
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}
+
+

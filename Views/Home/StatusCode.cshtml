@@ -1,0 +1,51 @@
+@{
+    ViewData["Title"] = "Error";
+    var statusCode = ViewBag.StatusCode as int? ?? 0;
+    var statusMessage = ViewBag.StatusMessage as string ?? "An error occurred while processing your request.";
+}
+
+<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full">
+        <div class="bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div class="mb-6">
+                <svg class="mx-auto h-16 w-16 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                @if (statusCode == 404)
+                {
+                    @:Page Not Found
+                }
+                else if (statusCode == 403)
+                {
+                    @:Access Denied
+                }
+                else
+                {
+                    @:Something Went Wrong
+                }
+            </h1>
+
+            @if (statusCode != 0)
+            {
+                <p class="text-sm text-gray-500 mb-2">
+                    Status Code: <span class="font-mono">@statusCode</span>
+                </p>
+            }
+
+            <p class="text-gray-600 mb-6">
+                @statusMessage
+            </p>
+
+            <a asp-controller="Home" asp-action="Index"
+               class="inline-block px-6 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors">
+                Return to Home
+            </a>
+        </div>
+    </div>
+</div>
+
+

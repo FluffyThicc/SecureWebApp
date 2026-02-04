@@ -1,0 +1,103 @@
+@model SecureWebApp.Models.LoginViewModel
+@{
+    ViewData["Title"] = "Login - Ace Job Agency";
+}
+
+<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-orange-50 to-blue-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-bold text-gray-900">Sign In</h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Welcome back to Ace Job Agency
+            </p>
+        </div>
+        <form asp-action="Login" method="post" class="mt-8 space-y-6 bg-white p-8 rounded-2xl shadow-lg">
+            @if (ViewBag.TimeoutMessage != null)
+            {
+                <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+                    @ViewBag.TimeoutMessage
+                </div>
+            }
+            <div asp-validation-summary="ModelOnly" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"></div>
+
+            <div class="space-y-4">
+                <div>
+                    <label asp-for="Email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input asp-for="Email" 
+                           type="email"
+                           class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                           placeholder="john.doe@example.com" />
+                    <span asp-validation-for="Email" class="block mt-1 text-xs text-red-600"></span>
+                </div>
+
+                <div>
+                    <label asp-for="Password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input asp-for="Password" 
+                           type="password"
+                           class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                           placeholder="••••••••" />
+                    <span asp-validation-for="Password" class="block mt-1 text-xs text-red-600"></span>
+                </div>
+
+                <div class="flex items-center">
+                    <input asp-for="RememberMe" class="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded" />
+                    <label asp-for="RememberMe" class="ml-2 block text-sm text-gray-700">Remember me</label>
+                </div>
+            </div>
+
+            <div>
+                <button type="submit" class="w-full py-3 px-6 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">
+                    Login
+                </button>
+            </div>
+
+            <div class="text-center">
+                <p class="text-sm text-gray-600">
+                    Don't have an account? 
+                    <a asp-action="Register" class="text-gray-900 font-medium hover:underline">Register here</a>
+                </p>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Google reCAPTCHA v3 -->
+<script src="https://www.google.com/recaptcha/api.js?render=@ViewBag.RecaptchaSiteKey" async defer></script>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        // Google reCAPTCHA v3
+        var recaptchaSiteKey = '@ViewBag.RecaptchaSiteKey';
+        
+        // Execute reCAPTCHA when form is submitted
+        var loginForm = document.querySelector('form[method="post"]');
+        if (loginForm) {
+            loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var form = this;
+            
+            if (recaptchaSiteKey && recaptchaSiteKey !== 'YOUR_RECAPTCHA_SITE_KEY_HERE') {
+                grecaptcha.ready(function() {
+                    grecaptcha.execute(recaptchaSiteKey, {action: 'login'}).then(function(token) {
+                        // Add hidden field with token
+                        var tokenInput = document.createElement('input');
+                        tokenInput.type = 'hidden';
+                        tokenInput.name = 'g-recaptcha-response';
+                        tokenInput.value = token;
+                        form.appendChild(tokenInput);
+                        
+                        // Submit the form
+                        form.submit();
+                    });
+                });
+            } else {
+                // If reCAPTCHA is not configured, submit normally
+                form.submit();
+            }
+            });
+        }
+    </script>
+}
+

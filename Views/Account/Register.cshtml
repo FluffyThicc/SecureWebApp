@@ -1,0 +1,357 @@
+@model SecureWebApp.Models.RegisterViewModel
+@{
+    ViewData["Title"] = "Register - Ace Job Agency";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-orange-50 to-blue-50 min-h-screen">
+    <!-- Top Navigation -->
+    <header class="fixed top-0 left-0 right-0 z-50 px-8 py-6">
+        <div class="flex justify-between items-center">
+            <a asp-controller="Home" asp-action="Index" class="flex items-center gap-2 text-lg font-semibold text-gray-900 hover:text-gray-700 transition-colors">
+                <span>Ace Job Agency</span>
+            </a>
+            <a asp-action="Login" class="px-6 py-2.5 bg-white text-black border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm">
+                Log in
+            </a>
+        </div>
+    </header>
+
+    <!-- Split Screen Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 min-h-screen pt-20">
+        <!-- Left Side: Form -->
+        <div class="flex items-center justify-center px-8 py-12 lg:px-16">
+            <div class="w-full max-w-md">
+                <!-- Form Header -->
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Create an account</h1>
+                    <p class="text-sm text-gray-600">Let's get started with your 30-day free trial.</p>
+                </div>
+
+                <form asp-action="Register" method="post" enctype="multipart/form-data">
+                    <div asp-validation-summary="ModelOnly" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"></div>
+
+                    <!-- Name Fields -->
+                    <div class="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label asp-for="FirstName" class="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                            <input asp-for="FirstName" 
+                                   class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                                   placeholder="John" />
+                            <span asp-validation-for="FirstName" class="block mt-1 text-xs text-red-600"></span>
+                        </div>
+                        <div>
+                            <label asp-for="LastName" class="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                            <input asp-for="LastName" 
+                                   class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                                   placeholder="Doe" />
+                            <span asp-validation-for="LastName" class="block mt-1 text-xs text-red-600"></span>
+                        </div>
+                    </div>
+
+                    <!-- Gender -->
+                    <div class="mb-5">
+                        <label asp-for="Gender" class="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                        <select asp-for="Gender" 
+                                class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors">
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <span asp-validation-for="Gender" class="block mt-1 text-xs text-red-600"></span>
+                    </div>
+
+                    <!-- NRIC -->
+                    <div class="mb-5">
+                        <label asp-for="NRIC" class="block text-sm font-medium text-gray-700 mb-2">NRIC</label>
+                        <input asp-for="NRIC" 
+                               class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                               placeholder="S1234567A" />
+                        <span asp-validation-for="NRIC" class="block mt-1 text-xs text-red-600"></span>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-5">
+                        <label asp-for="Email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input asp-for="Email" 
+                               type="email"
+                               class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                               placeholder="john.doe@example.com" />
+                        <span asp-validation-for="Email" class="block mt-1 text-xs text-red-600"></span>
+                    </div>
+
+                    <!-- Password Fields -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label asp-for="Password" class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                            <input asp-for="Password" 
+                                   type="password"
+                                   id="password"
+                                   class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                                   placeholder="Minimum 12 characters" />
+                            <span asp-validation-for="Password" class="block mt-1 text-xs text-red-600"></span>
+                            
+                            <!-- Password Strength Indicator -->
+                            <div class="mt-2">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div id="password-strength-bar" class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div id="password-strength-fill" class="h-full transition-all duration-300" style="width: 0%;"></div>
+                                    </div>
+                                    <span id="password-strength-text" class="text-xs font-medium text-gray-500">Weak</span>
+                                </div>
+                                <div id="password-requirements" class="text-xs text-gray-500 space-y-1">
+                                    <div id="req-length" class="flex items-center gap-1">
+                                        <span id="req-length-icon">✗</span>
+                                        <span>At least 12 characters</span>
+                                    </div>
+                                    <div id="req-lowercase" class="flex items-center gap-1">
+                                        <span id="req-lowercase-icon">✗</span>
+                                        <span>One lowercase letter</span>
+                                    </div>
+                                    <div id="req-uppercase" class="flex items-center gap-1">
+                                        <span id="req-uppercase-icon">✗</span>
+                                        <span>One uppercase letter</span>
+                                    </div>
+                                    <div id="req-number" class="flex items-center gap-1">
+                                        <span id="req-number-icon">✗</span>
+                                        <span>One number</span>
+                                    </div>
+                                    <div id="req-special" class="flex items-center gap-1">
+                                        <span id="req-special-icon">✗</span>
+                                        <span>One special character</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label asp-for="ConfirmPassword" class="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                            <input asp-for="ConfirmPassword" 
+                                   type="password"
+                                   id="confirmPassword"
+                                   class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400" 
+                                   placeholder="••••••••" />
+                            <span asp-validation-for="ConfirmPassword" class="block mt-1 text-xs text-red-600"></span>
+                            <div id="password-match" class="mt-2 text-xs"></div>
+                        </div>
+                    </div>
+
+                    <!-- Date of Birth -->
+                    <div class="mb-5">
+                        <label asp-for="DateOfBirth" class="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                        <input asp-for="DateOfBirth" 
+                               type="date"
+                               class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors" />
+                        <span asp-validation-for="DateOfBirth" class="block mt-1 text-xs text-red-600"></span>
+                    </div>
+
+                    <!-- Resume -->
+                    <div class="mb-5">
+                        <label asp-for="Resume" class="block text-sm font-medium text-gray-700 mb-2">Resume</label>
+                        <input asp-for="Resume" 
+                               type="file"
+                               accept=".pdf,.docx"
+                               class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors text-sm" />
+                        <span asp-validation-for="Resume" class="block mt-1 text-xs text-red-600"></span>
+                    </div>
+
+                    <!-- Who Am I -->
+                    <div class="mb-6">
+                        <label asp-for="WhoAmI" class="block text-sm font-medium text-gray-700 mb-2">Who Am I</label>
+                        <textarea asp-for="WhoAmI" 
+                                  rows="4"
+                                  class="w-full px-0 py-2 text-gray-900 bg-transparent border-0 border-b border-gray-300 focus:outline-none focus:border-gray-900 transition-colors placeholder:text-gray-400 resize-none" 
+                                  placeholder="Tell us about yourself..."></textarea>
+                        <span asp-validation-for="WhoAmI" class="block mt-1 text-xs text-red-600"></span>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="w-full py-3 px-6 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors shadow-lg mb-6">
+                        Create account
+                    </button>
+
+                    <!-- Footer -->
+                    <div class="text-center">
+                        <p class="text-sm text-gray-600">
+                            Already have an account? 
+                            <a asp-action="Login" class="text-gray-900 font-medium hover:underline">Log in</a>
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Side: Image Placeholder -->
+        <div class="hidden lg:flex items-center justify-center px-4 py-12 lg:px-12">
+            <div class="w-full max-w-2xl h-[650px] bg-black rounded-3xl shadow-2xl m-8"></div>
+        </div>
+    </div>
+
+    <!-- Google reCAPTCHA v3 -->
+    <script src="https://www.google.com/recaptcha/api.js?render=@ViewBag.RecaptchaSiteKey" async defer></script>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/dist/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        // Google reCAPTCHA v3
+        var recaptchaSiteKey = '@ViewBag.RecaptchaSiteKey';
+        
+        // Execute reCAPTCHA when form is submitted
+        var registerForm = document.querySelector('form[method="post"]');
+        if (registerForm) {
+            registerForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                var form = this;
+            
+                if (recaptchaSiteKey && recaptchaSiteKey !== 'YOUR_RECAPTCHA_SITE_KEY_HERE') {
+                    grecaptcha.ready(function() {
+                        grecaptcha.execute(recaptchaSiteKey, { action: 'register' }).then(function(token) {
+                            // Add hidden field with token
+                            var tokenInput = document.createElement('input');
+                            tokenInput.type = 'hidden';
+                            tokenInput.name = 'g-recaptcha-response';
+                            tokenInput.value = token;
+                            form.appendChild(tokenInput);
+                            
+                            // Submit the form
+                            form.submit();
+                        });
+                    });
+                } else {
+                    // If reCAPTCHA is not configured, submit normally
+                    form.submit();
+                }
+            });
+        }
+        
+        // Password Strength Checker (Client-side validation)
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordInput = document.getElementById('password');
+            const confirmPasswordInput = document.getElementById('confirmPassword');
+            const strengthFill = document.getElementById('password-strength-fill');
+            const strengthText = document.getElementById('password-strength-text');
+            
+            if (passwordInput) {
+                passwordInput.addEventListener('input', function() {
+                    checkPasswordStrength(this.value);
+                });
+            }
+            
+            if (confirmPasswordInput && passwordInput) {
+                confirmPasswordInput.addEventListener('input', function() {
+                    checkPasswordMatch(passwordInput.value, this.value);
+                });
+                
+                passwordInput.addEventListener('input', function() {
+                    checkPasswordMatch(this.value, confirmPasswordInput.value);
+                });
+            }
+            
+            function checkPasswordStrength(password) {
+                if (!password) {
+                    strengthFill.style.width = '0%';
+                    strengthFill.className = 'h-full transition-all duration-300 bg-gray-300';
+                    strengthText.textContent = 'Weak';
+                    strengthText.className = 'text-xs font-medium text-gray-500';
+                    updateRequirements('', false, false, false, false);
+                    return;
+                }
+                
+                const requirements = {
+                    length: password.length >= 12,
+                    lowercase: /[a-z]/.test(password),
+                    uppercase: /[A-Z]/.test(password),
+                    number: /[0-9]/.test(password),
+                    special: /[^a-zA-Z0-9]/.test(password)
+                };
+                
+                updateRequirements(password, requirements.length, requirements.lowercase, requirements.uppercase, requirements.number, requirements.special);
+                
+                const metCount = Object.values(requirements).filter(Boolean).length;
+                const strengthPercentage = (metCount / 5) * 100;
+                
+                strengthFill.style.width = strengthPercentage + '%';
+                
+                if (metCount === 5) {
+                    strengthFill.className = 'h-full transition-all duration-300 bg-green-500';
+                    strengthText.textContent = 'Strong';
+                    strengthText.className = 'text-xs font-medium text-green-600';
+                } else if (metCount >= 3) {
+                    strengthFill.className = 'h-full transition-all duration-300 bg-yellow-500';
+                    strengthText.textContent = 'Medium';
+                    strengthText.className = 'text-xs font-medium text-yellow-600';
+                } else {
+                    strengthFill.className = 'h-full transition-all duration-300 bg-red-500';
+                    strengthText.textContent = 'Weak';
+                    strengthText.className = 'text-xs font-medium text-red-600';
+                }
+            }
+            
+            function updateRequirements(password, length, lowercase, uppercase, number, special) {
+                updateRequirement('req-length', 'req-length-icon', length);
+                updateRequirement('req-lowercase', 'req-lowercase-icon', lowercase);
+                updateRequirement('req-uppercase', 'req-uppercase-icon', uppercase);
+                updateRequirement('req-number', 'req-number-icon', number);
+                updateRequirement('req-special', 'req-special-icon', special);
+            }
+            
+            function updateRequirement(reqId, iconId, met) {
+                const reqElement = document.getElementById(reqId);
+                const iconElement = document.getElementById(iconId);
+                
+                if (reqElement && iconElement) {
+                    if (met) {
+                        iconElement.textContent = '✓';
+                        iconElement.className = 'text-green-500 font-bold';
+                        reqElement.className = 'flex items-center gap-1 text-green-600';
+                    } else {
+                        iconElement.textContent = '✗';
+                        iconElement.className = 'text-red-500 font-bold';
+                        reqElement.className = 'flex items-center gap-1 text-gray-500';
+                    }
+                }
+            }
+            
+            function checkPasswordMatch(password, confirmPassword) {
+                const matchDiv = document.getElementById('password-match');
+                
+                if (!confirmPassword) {
+                    matchDiv.textContent = '';
+                    matchDiv.className = 'mt-2 text-xs';
+                    return;
+                }
+                
+                if (password === confirmPassword) {
+                    matchDiv.textContent = '✓ Passwords match';
+                    matchDiv.className = 'mt-2 text-xs text-green-600';
+                } else {
+                    matchDiv.textContent = '✗ Passwords do not match';
+                    matchDiv.className = 'mt-2 text-xs text-red-600';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
