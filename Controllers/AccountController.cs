@@ -1,3 +1,4 @@
+    using System.Net;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.AspNetCore.Authorization;
@@ -154,7 +155,7 @@
                 DateOfBirth = model.DateOfBirth,
                 ResumeFilePath = resumeFilePath,
                 ResumeFileName = resumeFileName,
-                WhoAmI = model.WhoAmI,
+                WhoAmI = WebUtility.HtmlEncode(model.WhoAmI ?? string.Empty),
                 EmailConfirmed = false, // In production, you'd want email confirmation
                 PasswordLastChangedAtUtc = DateTime.UtcNow
             };

@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Home - Ace Job Agency";
     var userInfo = ViewBag.UserInfo as dynamic;
 }
@@ -49,7 +49,7 @@
                         {
                             <div class="md:col-span-2">
                                 <strong class="text-gray-700 block mb-1">Who Am I:</strong>
-                                <p class="text-gray-600">@userInfo.WhoAmI</p>
+                                <p class="text-gray-600">@Html.Raw(userInfo.WhoAmI)</p>
                             </div>
                         }
                     </div>
