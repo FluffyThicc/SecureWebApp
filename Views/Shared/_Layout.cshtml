@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -93,6 +93,26 @@
     
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <script>
+            (function() {
+                var sessionTimeoutMs = 1 * 60 * 1000;
+                var warningMs = 30 * 1000;
+                var timeoutTimer, expireTimer;
+                function resetSessionTimer() {
+                    clearTimeout(timeoutTimer);
+                    clearTimeout(expireTimer);
+                    timeoutTimer = setTimeout(function() { alert('Your session will expire in 30 seconds. Please save your work.'); }, sessionTimeoutMs - warningMs);
+                    expireTimer = setTimeout(function() { window.location.href = '/Account/Login?sessionExpired=true'; }, sessionTimeoutMs);
+                }
+                resetSessionTimer();
+                document.addEventListener('mousemove', resetSessionTimer);
+                document.addEventListener('keypress', resetSessionTimer);
+                document.addEventListener('click', resetSessionTimer);
+            })();
+        </script>
+    }
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

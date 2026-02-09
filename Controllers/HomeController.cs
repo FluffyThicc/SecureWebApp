@@ -62,8 +62,11 @@ public class HomeController : Controller
     [Route("Home/StatusCode")]
     public IActionResult StatusCode(int code)
     {
-        // Log the status code for observability
-        _logger.LogWarning("HTTP status code {StatusCode} returned for request {Path}", code, HttpContext.Request.Path);
+        // Log the status code for observability (skip 0 - usually means connection reset/aborted)
+        if (code != 0)
+        {
+            _logger.LogWarning("HTTP status code {StatusCode} returned for request {Path}", code, HttpContext.Request.Path);
+        }
 
         ViewBag.StatusCode = code;
 

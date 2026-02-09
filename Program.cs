@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SecureWebApp.Data;
@@ -40,7 +41,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequiredLength = 12; // Minimum 12 characters as per requirements
     
     // Lockout settings - Rate limiting after 3 failures
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(10);
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(1);
     options.Lockout.MaxFailedAccessAttempts = 3; // Lockout after 3 login failures
     options.Lockout.AllowedForNewUsers = true;
     
@@ -55,23 +56,79 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>() // Saves details into the database
 .AddDefaultTokenProviders(); // Includes authenticator token provider for Google Authenticator (TOTP) support
 
+// Custom claims factory to add CurrentSessionToken to cookie for single active session validation
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, SessionTokenClaimsPrincipalFactory>();
+
+// Helper to explicitly clear auth cookie (used when SignOutAsync doesn't clear it reliably)
+static void ClearAuthCookie(HttpContext context)
+{
+    // Use OnStarting so the delete runs right before response is sent (ensures it isn't overwritten)
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Cookies.Delete(".AspNetCore.Identity.Application", new CookieOptions
+        {
+            Path = "/",
+            HttpOnly = true,
+            Secure = context.Request.IsHttps,
+            SameSite = SameSiteMode.Strict
+        });
+        return Task.CompletedTask;
+    });
+}
+
 // Configure cookie settings - Session Management
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
     options.LogoutPath = "/Account/Logout";
     options.AccessDeniedPath = "/Account/AccessDenied";
-    options.ExpireTimeSpan = TimeSpan.FromMinutes(30); // Session timeout: 30 minutes
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(1); // Session timeout: 1 minute
     options.SlidingExpiration = true; // Reset timeout on activity
     options.Cookie.HttpOnly = true; // Prevent XSS attacks
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Use HTTPS in production
     options.Cookie.SameSite = SameSiteMode.Strict; // CSRF protection
+
+    // Single active session: validate session token on every request. If token mismatch (logged in elsewhere), reject and sign out.
+    options.Events.OnValidatePrincipal = async context =>
+    {
+        if (context.Principal?.Identity?.IsAuthenticated != true) return;
+
+        var sessionTokenClaim = context.Principal.FindFirst("SessionToken")?.Value;
+        var userId = context.Principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? context.Principal.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId)) return;
+
+        var scope = context.HttpContext.RequestServices.CreateScope();
+        try
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null) { context.RejectPrincipal(); await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme); context.HttpContext.Session.Clear(); ClearAuthCookie(context.HttpContext); context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1"); return; }
+
+            var dbToken = user.CurrentSessionToken;
+            if (string.IsNullOrEmpty(dbToken) || sessionTokenClaim != dbToken)
+            {
+                var signInManager = scope.ServiceProvider.GetRequiredService<SignInManager<ApplicationUser>>();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                logger.LogWarning("Session token mismatch for user {UserId}. Forcing logout (logged in elsewhere).", userId);
+                dbContext.AuditLogs.Add(new AuditLog { UserId = userId, Action = "SessionInvalidated", Description = "Forced logout due to session token mismatch (logged in elsewhere)", IsSuccess = false, Timestamp = DateTime.UtcNow });
+                await dbContext.SaveChangesAsync();
+                context.RejectPrincipal();
+                await signInManager.SignOutAsync();
+                context.HttpContext.Session.Clear();
+                ClearAuthCookie(context.HttpContext);
+                context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1");
+            }
+        }
+        finally { scope.Dispose(); }
+    };
 });
 
 // Configure Session
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(30); // Session timeout
+    options.IdleTimeout = TimeSpan.FromMinutes(1); // Session timeout
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SameSite = SameSiteMode.Strict;
@@ -102,28 +159,32 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// Security headers
+// Security headers (use indexer to avoid ArgumentException on duplicate keys)
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
-    context.Response.Headers.Add("X-Frame-Options", "DENY");
-    context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
-    context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     await next();
 });
 
-app.UseHttpsRedirection();
+// Only redirect to HTTPS in production (in Development, app may run HTTP-only)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseStaticFiles();
 
 app.UseRouting();
 
 app.UseSession(); // Enable session middleware
 
-// Session timeout middleware - must be after UseSession but before UseAuthentication
-app.UseMiddleware<SecureWebApp.Middleware.SessionTimeoutMiddleware>();
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Session timeout middleware - must run after UseAuthentication so User is populated for the session check
+app.UseMiddleware<SecureWebApp.Middleware.SessionTimeoutMiddleware>();
 
 // Handle status code pages (e.g. 404, 500) with a friendly, custom page
 app.UseStatusCodePagesWithReExecute("/Home/StatusCode", "?code={0}");

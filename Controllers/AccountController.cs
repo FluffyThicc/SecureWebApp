@@ -193,14 +193,18 @@
                 
                 // Log registration activity to audit log
                 await LogAuditActivity(savedUser.Id, "Register", "User registration successful", true);
-                
-                // Create secured session upon successful registration/login
+
+                // Single active session: issue session token for new user
+                var sessionToken = Guid.NewGuid().ToString();
+                user.CurrentSessionToken = sessionToken;
+                user.SessionIssuedAtUtc = DateTime.UtcNow;
+                await _userManager.UpdateAsync(user);
+
                 HttpContext.Session.SetString("UserId", savedUser.Id);
-                HttpContext.Session.SetString("SessionId", Guid.NewGuid().ToString());
+                HttpContext.Session.SetString("SessionId", sessionToken);
                 HttpContext.Session.SetString("LoginTime", DateTime.UtcNow.ToString("O"));
                 HttpContext.Session.SetString("UserAgent", Request.Headers["User-Agent"].ToString());
-                
-                // Automatically sign in the user after registration
+
                 await _signInManager.SignInAsync(user, isPersistent: false);
                 
                 return RedirectToAction("Index", "Home");
@@ -245,32 +249,58 @@
         }
 
         [HttpGet]
-        public IActionResult Login(string? timeout = null)
+        public async Task<IActionResult> Login(string? timeout = null, string? sessionExpired = null, string? reason = null, string? returnUrl = null)
         {
-            // Check if user is already logged in
-            if (User.Identity?.IsAuthenticated == true)
+            var sessionInvalidated = Request.Query["sessionInvalidated"].FirstOrDefault() == "1";
+            var forcedLogout = timeout == "true" || sessionExpired == "true" || reason == "logged_in_elsewhere" || sessionInvalidated;
+
+            // If user landed here due to session timeout or forced logout, always clear the auth cookie.
+            // The server may already treat them as unauthenticated (expired cookie), but the browser
+            // may still have it; clearing in the response ensures the cookie is removed.
+            if (forcedLogout)
+            {
+                if (User.Identity?.IsAuthenticated == true)
+                {
+                    HttpContext.Session.Clear();
+                    await _signInManager.SignOutAsync();
+                }
+                ClearAuthCookie(HttpContext);
+
+                if (timeout == "true" || sessionExpired == "true")
+                    TempData["SessionExpired"] = "Your session has expired. Please login again.";
+                if (reason == "logged_in_elsewhere" || sessionInvalidated)
+                    TempData["SessionInvalidated"] = "You have been signed out because you logged in from another device or browser.";
+            }
+            else if (User.Identity?.IsAuthenticated == true)
             {
                 return RedirectToAction("Index", "Home");
             }
 
-            // Show timeout message if redirected from session timeout
-            if (timeout == "true")
-            {
-                ViewBag.TimeoutMessage = "Your session has expired due to inactivity. Please login again.";
-            }
-
             ViewBag.RecaptchaSiteKey = _recaptchaService.GetSiteKey();
-            return View();
+            return View(new LoginViewModel { ReturnUrl = returnUrl });
+        }
+
+        private static void ClearAuthCookie(HttpContext context)
+        {
+            const string cookieName = ".AspNetCore.Identity.Application";
+            context.Response.Cookies.Delete(cookieName, new CookieOptions
+            {
+                Path = "/",
+                HttpOnly = true,
+                SameSite = SameSiteMode.Strict,
+                Secure = context.Request.IsHttps
+            });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
-            returnUrl ??= Url.Content("~/");
+            returnUrl ??= model.ReturnUrl ?? Url.Content("~/");
 
             if (!ModelState.IsValid)
             {
+                model.ReturnUrl = returnUrl;
                 return View(model);
             }
 
@@ -278,7 +308,7 @@
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var userAgent = Request.Headers["User-Agent"].ToString();
 
-            // Verify reCAPTCHA token
+            // Verify reCAPTCHA token (run before password check - token is single-use)
             var recaptchaToken = Request.Form["g-recaptcha-response"].ToString();
             var isRecaptchaValid = await _recaptchaService.VerifyTokenAsync(recaptchaToken, ipAddress);
             
@@ -287,6 +317,7 @@
                 ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
                 await LogAuditActivity("", "Login", $"reCAPTCHA verification failed for email: {model.Email}", false, 
                     ipAddress, userAgent, failureReason: "reCAPTCHA verification failed");
+                model.ReturnUrl = returnUrl;
                 return View(model);
             }
 
@@ -299,6 +330,7 @@
                     ipAddress, userAgent, failureReason: "Invalid email address");
                 
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                model.ReturnUrl = returnUrl;
                 return View(model);
             }
 
@@ -323,21 +355,42 @@
                 }
                 else
                 {
-                    // No 2FA enabled - sign in directly (but log that 2FA is not enabled)
+                    // No 2FA enabled - sign in directly
                     _logger.LogInformation("User {UserId} logged in without 2FA enabled", user.Id);
-                    
-                    // Create secured session upon successful login
-                    var sessionId = Guid.NewGuid().ToString();
+
+                    // Single active session: issue new session token (kicks out previous session)
+                    var previousToken = user.CurrentSessionToken;
+                    var isMultipleLogin = !string.IsNullOrEmpty(previousToken);
+
+                    var sessionToken = Guid.NewGuid().ToString();
+                    user.CurrentSessionToken = sessionToken;
+                    user.SessionIssuedAtUtc = DateTime.UtcNow;
+                    await _userManager.UpdateAsync(user);
+
+                    var sessionId = sessionToken;
                     HttpContext.Session.SetString("UserId", user.Id);
                     HttpContext.Session.SetString("SessionId", sessionId);
                     HttpContext.Session.SetString("LoginTime", DateTime.UtcNow.ToString("O"));
                     HttpContext.Session.SetString("UserAgent", userAgent);
                     HttpContext.Session.SetString("IpAddress", ipAddress);
 
-                    await LogAuditActivity(user.Id, "Login", "User logged in successfully", true, 
-                        ipAddress, userAgent, sessionId);
+                    if (isMultipleLogin)
+                    {
+                        await LogAuditActivity(user.Id, "Login", $"Multiple login detected. Previous session invalidated.", true, ipAddress, userAgent, sessionId);
+                    }
+                    else
+                    {
+                        await LogAuditActivity(user.Id, "Login", "User logged in successfully", true, ipAddress, userAgent, sessionId);
+                    }
 
                     await _signInManager.SignInAsync(user, model.RememberMe);
+
+                    // If password expired, redirect to Change Password instead of home
+                    if (IsPasswordExpired(user.PasswordLastChangedAtUtc))
+                    {
+                        TempData["PasswordExpiredMessage"] = "Your password has expired. Please change it now.";
+                        return RedirectToAction(nameof(ChangePassword));
+                    }
                     return LocalRedirect(returnUrl);
                 }
             }
@@ -349,7 +402,8 @@
                     ipAddress, userAgent, failureReason: "Account locked out");
                 
                 _logger.LogWarning("User account locked out.");
-                ModelState.AddModelError(string.Empty, "Account locked out after 3 failed attempts. Please try again in 10 minutes.");
+                ModelState.AddModelError(string.Empty, "Account locked out after 3 failed attempts. Please try again in 1 minute.");
+                model.ReturnUrl = returnUrl;
                 return View(model);
             }
             else
@@ -359,6 +413,7 @@
                     ipAddress, userAgent, failureReason: "Invalid password");
                 
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                model.ReturnUrl = returnUrl;
                 return View(model);
             }
         }
@@ -420,44 +475,43 @@
             HttpContext.Session.Remove("2FA_RememberMe");
             HttpContext.Session.Remove("2FA_ReturnUrl");
 
-            // Create secured session upon successful 2FA verification and login
+            // Single active session: issue new session token (kicks out previous session)
+            var previousToken = user.CurrentSessionToken;
+            var isMultipleLogin = !string.IsNullOrEmpty(previousToken);
+
+            var sessionToken = Guid.NewGuid().ToString();
+            user.CurrentSessionToken = sessionToken;
+            user.SessionIssuedAtUtc = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
             var userAgent = Request.Headers["User-Agent"].ToString();
-
-            var existingSessionId = HttpContext.Session.GetString("SessionId");
-            var isMultipleLogin = !string.IsNullOrEmpty(existingSessionId) && User.Identity?.IsAuthenticated == true;
-
-            var sessionId = Guid.NewGuid().ToString();
+            var sessionId = sessionToken;
             HttpContext.Session.SetString("UserId", user.Id);
             HttpContext.Session.SetString("SessionId", sessionId);
             HttpContext.Session.SetString("LoginTime", DateTime.UtcNow.ToString("O"));
             HttpContext.Session.SetString("UserAgent", userAgent);
             HttpContext.Session.SetString("IpAddress", ipAddress);
 
-            // Sign in the user (issues auth cookie)
             await _signInManager.SignInAsync(user, model.RememberMe);
 
-            // Detect and log multiple logins
             if (isMultipleLogin)
             {
-                await LogAuditActivity(user.Id, "Login",
-                    $"Multiple login detected. Previous session: {existingSessionId}", true,
-                    ipAddress, userAgent, sessionId);
+                await LogAuditActivity(user.Id, "Login", "Multiple login detected. Previous session invalidated.", true, ipAddress, userAgent, sessionId);
             }
             else
             {
-                await LogAuditActivity(user.Id, "Login", "User logged in successfully (2FA)", true,
-                    ipAddress, userAgent, sessionId);
+                await LogAuditActivity(user.Id, "Login", "User logged in successfully (2FA)", true, ipAddress, userAgent, sessionId);
             }
 
             _logger.LogInformation("User logged in with 2FA. Session ID: {SessionId}", sessionId);
 
-            // Check password age and gently prompt if password is expired
+            // If password expired, redirect to Change Password instead of home
             if (IsPasswordExpired(user.PasswordLastChangedAtUtc))
             {
-                TempData["PasswordExpiredMessage"] = "For your security, your password is older than the recommended maximum age. Please change it now.";
+                TempData["PasswordExpiredMessage"] = "Your password has expired. Please change it now.";
+                return RedirectToAction(nameof(ChangePassword));
             }
-
             var returnUrl = model.ReturnUrl ?? Url.Content("~/");
             return LocalRedirect(returnUrl);
         }
@@ -478,11 +532,21 @@
                     ipAddress, userAgent, sessionId);
             }
 
-            // Clear session data
-            HttpContext.Session.Clear();
+            // Invalidate session token in DB (single active session)
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user != null)
+                {
+                    user.CurrentSessionToken = null;
+                    user.SessionIssuedAtUtc = null;
+                    await _userManager.UpdateAsync(user);
+                }
+            }
 
-            // Sign out user
+            HttpContext.Session.Clear();
             await _signInManager.SignOutAsync();
+            ClearAuthCookie(HttpContext);
 
             _logger.LogInformation("User logged out. Session ID: {SessionId}", sessionId);
 
@@ -604,8 +668,14 @@
 
         [Authorize]
         [HttpGet]
-        public IActionResult ChangePassword()
+        public async Task<IActionResult> ChangePassword()
         {
+            var user = await _userManager.GetUserAsync(User);
+            if (user != null && IsPasswordTooYoung(user.PasswordLastChangedAtUtc))
+            {
+                TempData["PasswordChangeBlockedMessage"] = $"You recently changed your password. Please wait at least {(int)PasswordMinimumAge.TotalMinutes} minute(s) before changing it again.";
+                return RedirectToAction("Index", "Home");
+            }
             return View(new ChangePasswordViewModel());
         }
 
@@ -628,9 +698,8 @@
             // Enforce minimum password age (cannot change too frequently)
             if (IsPasswordTooYoung(user.PasswordLastChangedAtUtc))
             {
-                ModelState.AddModelError(string.Empty,
-                    $"You recently changed your password. Please wait at least {PasswordMinimumAge.TotalMinutes:N0} minute(s) before changing it again.");
-                return View(model);
+                TempData["PasswordChangeBlockedMessage"] = $"You recently changed your password. Please wait at least {(int)PasswordMinimumAge.TotalMinutes} minute(s) before changing it again.";
+                return RedirectToAction("Index", "Home");
             }
 
             // Enforce password history (no reuse of last N passwords)
@@ -674,9 +743,9 @@
             }
 
             var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user == null || !(await _userManager.IsEmailConfirmedAsync(user)))
+            if (user == null)
             {
-                // Do not reveal that the user does not exist or is not confirmed
+                // Do not reveal that the user does not exist
                 return View("ForgotPasswordConfirmation");
             }
 

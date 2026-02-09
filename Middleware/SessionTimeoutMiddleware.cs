@@ -1,6 +1,7 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using SecureWebApp.Data;
 using SecureWebApp.Models;
-using Microsoft.AspNetCore.Identity;
 
 namespace SecureWebApp.Middleware;
 
@@ -49,14 +50,15 @@ public class SessionTimeoutMiddleware
                     await signInManager.SignOutAsync();
                 }
                 
-                context.Response.Redirect("/Account/Login?timeout=true");
+                ClearAuthCookie(context);
+                context.Response.Redirect("/Account/Login?sessionExpired=true");
                 return;
             }
 
             // Check session timeout (30 minutes)
             if (DateTime.TryParse(loginTimeStr, out var loginTime))
             {
-                var sessionTimeout = TimeSpan.FromMinutes(30);
+                var sessionTimeout = TimeSpan.FromMinutes(1);
                 var elapsed = DateTime.UtcNow - loginTime.ToUniversalTime();
 
                 if (elapsed > sessionTimeout)
@@ -79,7 +81,7 @@ public class SessionTimeoutMiddleware
                                 SessionId = sessionId,
                                 Timestamp = DateTime.UtcNow,
                                 IsSuccess = false,
-                                FailureReason = "Session timeout (30 minutes)"
+                                FailureReason = "Session timeout"
                             };
                             dbContext.AuditLogs.Add(auditLog);
                             await dbContext.SaveChangesAsync();
@@ -99,7 +101,8 @@ public class SessionTimeoutMiddleware
                         await signInManager.SignOutAsync();
                     }
                     
-                    context.Response.Redirect("/Account/Login?timeout=true");
+                    ClearAuthCookie(context);
+                    context.Response.Redirect("/Account/Login?sessionExpired=true");
                     return;
                 }
 
@@ -109,6 +112,18 @@ public class SessionTimeoutMiddleware
         }
 
         await _next(context);
+    }
+
+    private static void ClearAuthCookie(HttpContext context)
+    {
+        // Direct delete (same as AccountController) - OnStarting may not run when middleware short-circuits without calling _next
+        context.Response.Cookies.Delete(".AspNetCore.Identity.Application", new CookieOptions
+        {
+            Path = "/",
+            HttpOnly = true,
+            Secure = context.Request.IsHttps,
+            SameSite = SameSiteMode.Strict
+        });
     }
 }
 

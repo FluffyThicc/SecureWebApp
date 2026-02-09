@@ -1,10 +1,22 @@
 @{
     ViewData["Title"] = "Home - Ace Job Agency";
     var userInfo = ViewBag.UserInfo as dynamic;
+    var passwordBlockedMsg = TempData["PasswordChangeBlockedMessage"] as string;
 }
 
 @if (User.Identity?.IsAuthenticated == true && userInfo != null)
 {
+    @if (!string.IsNullOrEmpty(passwordBlockedMsg))
+    {
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+            <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm text-center">
+                @passwordBlockedMsg
+            </div>
+        </div>
+        @section Scripts {
+            <script>alert(@Html.Raw(Json.Serialize(passwordBlockedMsg)));</script>
+        }
+    }
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="max-w-4xl mx-auto">
             <div class="bg-white rounded-2xl shadow-xl overflow-hidden">

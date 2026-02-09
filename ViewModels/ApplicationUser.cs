@@ -44,5 +44,17 @@ public class ApplicationUser : IdentityUser
     /// Used to enforce minimum and maximum password age policies.
     /// </summary>
     public DateTime? PasswordLastChangedAtUtc { get; set; }
+
+    /// <summary>
+    /// Server-side session token (GUID) for single active session enforcement.
+    /// Issued on login, validated on each request. Cleared on logout.
+    /// </summary>
+    [StringLength(64)]
+    public string? CurrentSessionToken { get; set; }
+
+    /// <summary>
+    /// When the current session token was issued (UTC).
+    /// </summary>
+    public DateTime? SessionIssuedAtUtc { get; set; }
 }
 
