@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using SecureWebApp.Data;
 using SecureWebApp.Models;
+using SecureWebApp.Services;
 
 namespace SecureWebApp.Middleware;
 
@@ -42,15 +43,14 @@ public class SessionTimeoutMiddleware
             if (string.IsNullOrEmpty(sessionId) || string.IsNullOrEmpty(loginTimeStr))
             {
                 _logger.LogWarning("Session timeout detected for user. Redirecting to login.");
-                context.Session.Clear();
-                
                 using (var scope = serviceProvider.CreateScope())
                 {
                     var signInManager = scope.ServiceProvider.GetRequiredService<SignInManager<ApplicationUser>>();
                     await signInManager.SignOutAsync();
                 }
-                
-                ClearAuthCookie(context);
+                context.Session.Clear();
+                CookieClearHelper.ClearSessionCookie(context);
+                CookieClearHelper.ClearAuthCookie(context);
                 context.Response.Redirect("/Account/Login?sessionExpired=true");
                 return;
             }
@@ -93,15 +93,14 @@ public class SessionTimeoutMiddleware
                     }
 
                     _logger.LogWarning("Session timeout for user {UserId}. Session duration: {Elapsed}", userId, elapsed);
-                    context.Session.Clear();
-                    
                     using (var scope = serviceProvider.CreateScope())
                     {
                         var signInManager = scope.ServiceProvider.GetRequiredService<SignInManager<ApplicationUser>>();
                         await signInManager.SignOutAsync();
                     }
-                    
-                    ClearAuthCookie(context);
+                    context.Session.Clear();
+                    CookieClearHelper.ClearSessionCookie(context);
+                    CookieClearHelper.ClearAuthCookie(context);
                     context.Response.Redirect("/Account/Login?sessionExpired=true");
                     return;
                 }
@@ -112,18 +111,6 @@ public class SessionTimeoutMiddleware
         }
 
         await _next(context);
-    }
-
-    private static void ClearAuthCookie(HttpContext context)
-    {
-        // Direct delete (same as AccountController) - OnStarting may not run when middleware short-circuits without calling _next
-        context.Response.Cookies.Delete(".AspNetCore.Identity.Application", new CookieOptions
-        {
-            Path = "/",
-            HttpOnly = true,
-            Secure = context.Request.IsHttps,
-            SameSite = SameSiteMode.Strict
-        });
     }
 }
 

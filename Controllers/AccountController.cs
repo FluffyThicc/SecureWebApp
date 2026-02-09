@@ -260,11 +260,10 @@
             if (forcedLogout)
             {
                 if (User.Identity?.IsAuthenticated == true)
-                {
-                    HttpContext.Session.Clear();
                     await _signInManager.SignOutAsync();
-                }
-                ClearAuthCookie(HttpContext);
+                HttpContext.Session.Clear();
+                CookieClearHelper.ClearSessionCookie(HttpContext);
+                CookieClearHelper.ClearAuthCookie(HttpContext);
 
                 if (timeout == "true" || sessionExpired == "true")
                     TempData["SessionExpired"] = "Your session has expired. Please login again.";
@@ -278,18 +277,6 @@
 
             ViewBag.RecaptchaSiteKey = _recaptchaService.GetSiteKey();
             return View(new LoginViewModel { ReturnUrl = returnUrl });
-        }
-
-        private static void ClearAuthCookie(HttpContext context)
-        {
-            const string cookieName = ".AspNetCore.Identity.Application";
-            context.Response.Cookies.Delete(cookieName, new CookieOptions
-            {
-                Path = "/",
-                HttpOnly = true,
-                SameSite = SameSiteMode.Strict,
-                Secure = context.Request.IsHttps
-            });
         }
 
         [HttpPost]
@@ -402,6 +389,8 @@
                     ipAddress, userAgent, failureReason: "Account locked out");
                 
                 _logger.LogWarning("User account locked out.");
+                HttpContext.Session.Clear();
+                CookieClearHelper.ClearSessionCookie(HttpContext);
                 ModelState.AddModelError(string.Empty, "Account locked out after 3 failed attempts. Please try again in 1 minute.");
                 model.ReturnUrl = returnUrl;
                 return View(model);
@@ -545,8 +534,9 @@
             }
 
             HttpContext.Session.Clear();
+            CookieClearHelper.ClearSessionCookie(HttpContext);
             await _signInManager.SignOutAsync();
-            ClearAuthCookie(HttpContext);
+            CookieClearHelper.ClearAuthCookie(HttpContext);
 
             _logger.LogInformation("User logged out. Session ID: {SessionId}", sessionId);
 
@@ -557,6 +547,7 @@
         [HttpGet]
         public IActionResult AccessDenied()
         {
+            Response.StatusCode = 403;
             return View();
         }
 

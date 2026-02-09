@@ -59,23 +59,6 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 // Custom claims factory to add CurrentSessionToken to cookie for single active session validation
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, SessionTokenClaimsPrincipalFactory>();
 
-// Helper to explicitly clear auth cookie (used when SignOutAsync doesn't clear it reliably)
-static void ClearAuthCookie(HttpContext context)
-{
-    // Use OnStarting so the delete runs right before response is sent (ensures it isn't overwritten)
-    context.Response.OnStarting(() =>
-    {
-        context.Response.Cookies.Delete(".AspNetCore.Identity.Application", new CookieOptions
-        {
-            Path = "/",
-            HttpOnly = true,
-            Secure = context.Request.IsHttps,
-            SameSite = SameSiteMode.Strict
-        });
-        return Task.CompletedTask;
-    });
-}
-
 // Configure cookie settings - Session Management
 builder.Services.ConfigureApplicationCookie(options =>
 {
@@ -104,7 +87,16 @@ builder.Services.ConfigureApplicationCookie(options =>
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var user = await dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null) { context.RejectPrincipal(); await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme); context.HttpContext.Session.Clear(); ClearAuthCookie(context.HttpContext); context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1"); return; }
+            if (user == null)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+                context.HttpContext.Session.Clear();
+                CookieClearHelper.ClearSessionCookie(context.HttpContext);
+                CookieClearHelper.ClearAuthCookie(context.HttpContext);
+                context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1");
+                return;
+            }
 
             var dbToken = user.CurrentSessionToken;
             if (string.IsNullOrEmpty(dbToken) || sessionTokenClaim != dbToken)
@@ -117,7 +109,8 @@ builder.Services.ConfigureApplicationCookie(options =>
                 context.RejectPrincipal();
                 await signInManager.SignOutAsync();
                 context.HttpContext.Session.Clear();
-                ClearAuthCookie(context.HttpContext);
+                CookieClearHelper.ClearSessionCookie(context.HttpContext);
+                CookieClearHelper.ClearAuthCookie(context.HttpContext);
                 context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1");
             }
         }
