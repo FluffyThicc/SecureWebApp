@@ -94,6 +94,7 @@ builder.Services.ConfigureApplicationCookie(options =>
                 context.HttpContext.Session.Clear();
                 CookieClearHelper.ClearSessionCookie(context.HttpContext);
                 CookieClearHelper.ClearAuthCookie(context.HttpContext);
+                CookieClearHelper.SetForcedLogoutReasonCookie(context.HttpContext, "invalidated");
                 context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1");
                 return;
             }
@@ -111,6 +112,7 @@ builder.Services.ConfigureApplicationCookie(options =>
                 context.HttpContext.Session.Clear();
                 CookieClearHelper.ClearSessionCookie(context.HttpContext);
                 CookieClearHelper.ClearAuthCookie(context.HttpContext);
+                CookieClearHelper.SetForcedLogoutReasonCookie(context.HttpContext, "invalidated");
                 context.HttpContext.Response.Redirect("/Account/Login?sessionInvalidated=1");
             }
         }

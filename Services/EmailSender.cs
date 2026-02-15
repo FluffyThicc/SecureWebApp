@@ -30,8 +30,7 @@ public class EmailSender : IEmailSender
         var host = _configuration["Smtp:Host"];
         if (string.IsNullOrWhiteSpace(host))
         {
-            _logger.LogInformation("SMTP not configured. Would send email to {Email} with subject '{Subject}'. Body: {Body}",
-                toEmail, subject, htmlMessage);
+            _logger.LogInformation("SMTP not configured. Email send skipped (recipient and body omitted for security).");
             return;
         }
 
@@ -61,11 +60,11 @@ public class EmailSender : IEmailSender
         try
         {
             await client.SendMailAsync(mailMessage);
-            _logger.LogInformation("Email sent successfully to {Email} with subject '{Subject}'.", toEmail, subject);
+            _logger.LogInformation("Email sent successfully (recipient omitted for privacy).");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send email to {Email} with subject '{Subject}'.", toEmail, subject);
+            _logger.LogError(ex, "Failed to send email (recipient omitted for privacy).");
             throw;
         }
     }

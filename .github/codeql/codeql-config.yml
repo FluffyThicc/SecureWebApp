@@ -1,0 +1,4 @@
+# Exclude third-party JavaScript libraries from CodeQL to avoid alerts in code we do not maintain.
+# Our application uses server-side validation and does not pass unsanitized user input to these libs.
+paths-ignore:
+  - 'wwwroot/lib/**'

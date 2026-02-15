@@ -63,9 +63,11 @@ public class HomeController : Controller
     public IActionResult StatusCode(int code)
     {
         // Log the status code for observability (skip 0 - usually means connection reset/aborted)
+        // Sanitize path to prevent log forging (CWE-117): user-controlled Path must not contain newlines/control chars
         if (code != 0)
         {
-            _logger.LogWarning("HTTP status code {StatusCode} returned for request {Path}", code, HttpContext.Request.Path);
+            var pathForLog = SanitizeForLog(HttpContext.Request.Path.Value);
+            _logger.LogWarning("HTTP status code {StatusCode} returned for request {Path}", code, pathForLog);
         }
 
         ViewBag.StatusCode = code;
@@ -86,5 +88,14 @@ public class HomeController : Controller
     public IActionResult Error()
     {
         return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+    }
+
+    /// <summary>
+    /// Removes control characters (e.g. newlines) from a string before logging to prevent log forging (CWE-117).
+    /// </summary>
+    private static string SanitizeForLog(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return string.Empty;
+        return string.Concat(value.Where(c => !char.IsControl(c)));
     }
 }

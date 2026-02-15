@@ -51,6 +51,7 @@ public class SessionTimeoutMiddleware
                 context.Session.Clear();
                 CookieClearHelper.ClearSessionCookie(context);
                 CookieClearHelper.ClearAuthCookie(context);
+                CookieClearHelper.SetForcedLogoutReasonCookie(context, "expired");
                 context.Response.Redirect("/Account/Login?sessionExpired=true");
                 return;
             }
@@ -101,6 +102,7 @@ public class SessionTimeoutMiddleware
                     context.Session.Clear();
                     CookieClearHelper.ClearSessionCookie(context);
                     CookieClearHelper.ClearAuthCookie(context);
+                    CookieClearHelper.SetForcedLogoutReasonCookie(context, "expired");
                     context.Response.Redirect("/Account/Login?sessionExpired=true");
                     return;
                 }

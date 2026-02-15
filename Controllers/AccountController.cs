@@ -249,14 +249,13 @@
         }
 
         [HttpGet]
-        public async Task<IActionResult> Login(string? timeout = null, string? sessionExpired = null, string? reason = null, string? returnUrl = null)
+        public async Task<IActionResult> Login(string? returnUrl = null)
         {
-            var sessionInvalidated = Request.Query["sessionInvalidated"].FirstOrDefault() == "1";
-            var forcedLogout = timeout == "true" || sessionExpired == "true" || reason == "logged_in_elsewhere" || sessionInvalidated;
+            // Only perform sign-out when the server set the forced-logout cookie (CWE-247: avoid user-controlled bypass).
+            // Middleware and OnValidatePrincipal set SWA.ForcedLogoutReason when redirecting after timeout/invalidation.
+            var forcedLogoutReason = Request.Cookies[CookieClearHelper.ForcedLogoutReasonCookieName];
+            var forcedLogout = !string.IsNullOrEmpty(forcedLogoutReason);
 
-            // If user landed here due to session timeout or forced logout, always clear the auth cookie.
-            // The server may already treat them as unauthenticated (expired cookie), but the browser
-            // may still have it; clearing in the response ensures the cookie is removed.
             if (forcedLogout)
             {
                 if (User.Identity?.IsAuthenticated == true)
@@ -264,11 +263,11 @@
                 HttpContext.Session.Clear();
                 CookieClearHelper.ClearSessionCookie(HttpContext);
                 CookieClearHelper.ClearAuthCookie(HttpContext);
-
-                if (timeout == "true" || sessionExpired == "true")
+                if (forcedLogoutReason == "expired")
                     TempData["SessionExpired"] = "Your session has expired. Please login again.";
-                if (reason == "logged_in_elsewhere" || sessionInvalidated)
+                else
                     TempData["SessionInvalidated"] = "You have been signed out because you logged in from another device or browser.";
+                Response.Cookies.Delete(CookieClearHelper.ForcedLogoutReasonCookieName, new CookieOptions { Path = "/Account", HttpOnly = true, SameSite = SameSiteMode.Strict, Secure = Request.IsHttps });
             }
             else if (User.Identity?.IsAuthenticated == true)
             {
